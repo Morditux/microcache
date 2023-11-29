@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/cespare/xxhash"
+	"github.com/vmihailenco/msgpack"
 )
 
 type Config struct {
@@ -19,21 +20,27 @@ type Bucket struct {
 
 type Cache struct {
 	config  Config
-	buckets map[uint64]*Bucket
+	buckets []*Bucket
 	keys    *Queue[uint64]
 	size    int64
+	mutex   *sync.Mutex
 }
 
 func New(config Config) *Cache {
 	if config.Buckets == 0 {
 		config.Buckets = 16
 	}
-	return &Cache{
+	cache := &Cache{
 		config:  config,
-		buckets: make(map[uint64]*Bucket),
+		buckets: make([]*Bucket, config.Buckets),
 		keys:    NewQueue[uint64](),
 		size:    0,
+		mutex:   &sync.Mutex{},
 	}
+	for i := 0; i < config.Buckets; i++ {
+		cache.buckets[i] = newBucket()
+	}
+	return cache
 }
 
 func newBucket() *Bucket {
@@ -66,15 +73,31 @@ func (b *Bucket) Delete(key string) {
 	delete(b.items, key)
 }
 
-func (c *Cache) Get(key string) *Item {
+func (c *Cache) Get(key string, value any) bool {
 	bucket := c.getBucket(c.findBucket(key))
-	return bucket.Get(key)
+	item := bucket.Get(key)
+	if item == nil {
+		return false
+	}
+	err := msgpack.Unmarshal(item.Value, value)
+	if err != nil {
+		panic(err)
+	}
+	return true
 }
 
-func (c *Cache) Set(key string, value *Item) {
+func (c *Cache) Set(key string, value any) {
+	data, err := msgpack.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	item := &Item{
+		Key:   key,
+		Value: data,
+	}
 	b := c.findBucket(key)
 	bucket := c.getBucket(b)
-	bucket.Set(key, value)
+	bucket.Set(key, item)
 	c.keys.Push(b)
 }
 
@@ -89,10 +112,6 @@ func (c *Cache) findBucket(key string) uint64 {
 }
 
 func (c *Cache) getBucket(key uint64) *Bucket {
-	bucket, ok := c.buckets[key]
-	if !ok {
-		bucket = newBucket()
-		c.buckets[key] = bucket
-	}
+	bucket := c.buckets[key]
 	return bucket
 }
