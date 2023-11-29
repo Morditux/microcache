@@ -2,13 +2,14 @@ package microcache
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/cespare/xxhash"
 	"github.com/vmihailenco/msgpack"
 )
 
 type Config struct {
-	MaxSize int64
+	MaxSize uint64
 	Buckets int
 }
 
@@ -22,8 +23,10 @@ type Cache struct {
 	config  Config
 	buckets []*Bucket
 	keys    *Queue[uint64]
-	size    int64
+	size    uint64
 	mutex   *sync.Mutex
+	hits    atomic.Uint64
+	misses  atomic.Uint64
 }
 
 func New(config Config) *Cache {
@@ -77,8 +80,10 @@ func (c *Cache) Get(key string, value any) bool {
 	bucket := c.getBucket(c.findBucket(key))
 	item := bucket.Get(key)
 	if item == nil {
+		c.misses.Add(1)
 		return false
 	}
+	c.hits.Add(1)
 	err := msgpack.Unmarshal(item.Value, value)
 	if err != nil {
 		panic(err)
@@ -95,6 +100,19 @@ func (c *Cache) Set(key string, value any) {
 		Key:   key,
 		Value: data,
 	}
+	size := item.Size()
+	c.mutex.Lock()
+	if c.size+size > c.config.MaxSize {
+		for c.size+size > c.config.MaxSize {
+			b := c.keys.Pop()
+			bucket := c.getBucket(b)
+			item := bucket.Get(key)
+			c.size -= item.Size()
+			bucket.Delete(key)
+		}
+	}
+	defer c.mutex.Unlock()
+
 	b := c.findBucket(key)
 	bucket := c.getBucket(b)
 	bucket.Set(key, item)
@@ -102,8 +120,17 @@ func (c *Cache) Set(key string, value any) {
 }
 
 func (c *Cache) Delete(key string) {
+
 	bucket := c.getBucket(c.findBucket(key))
+	item := bucket.Get(key)
+	if item == nil {
+		return
+	}
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.size -= item.Size()
 	bucket.Delete(key)
+
 }
 
 func (c *Cache) findBucket(key string) uint64 {
@@ -114,4 +141,12 @@ func (c *Cache) findBucket(key string) uint64 {
 func (c *Cache) getBucket(key uint64) *Bucket {
 	bucket := c.buckets[key]
 	return bucket
+}
+
+func (c *Cache) Hits() uint64 {
+	return c.hits.Load()
+}
+
+func (c *Cache) Misses() uint64 {
+	return c.misses.Load()
 }

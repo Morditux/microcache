@@ -12,6 +12,6 @@ func NewItem(key string, value []byte, timeToLive int64) *Item {
 	}
 }
 
-func (i *Item) Size() int {
-	return len(i.Key) + len(i.Value)
+func (i *Item) Size() uint64 {
+	return uint64(len(i.Key) + len(i.Value))
 }

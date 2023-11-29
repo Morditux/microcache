@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	cache "github.com/Morditux/microcache/microcache"
+	"github.com/google/uuid"
 )
 
 func TestNewCache(tests *testing.T) {
@@ -55,4 +56,25 @@ func TestCacheSet(tests *testing.T) {
 	if ret != value {
 		tests.Error("Cache returned wrong value")
 	}
+}
+
+func BenchmarkCacheSet(b *testing.B) {
+	config := cache.Config{
+		MaxSize: 256 * 1024 * 1024,
+		Buckets: 128,
+	}
+	cache := cache.New(config)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			value := uuid.New().String()
+			key := uuid.New().String()
+			cache.Set(key, &value)
+			ret := ""
+			cache.Get(key, &ret)
+			if ret != value {
+				b.Error("Cache returned wrong value " + ret + " for key test")
+			}
+		}
+	})
 }
