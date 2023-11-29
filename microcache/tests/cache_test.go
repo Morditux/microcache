@@ -1,6 +1,7 @@
 package microcache_test
 
 import (
+	"sync"
 	"testing"
 
 	cache "github.com/Morditux/microcache/microcache"
@@ -77,4 +78,30 @@ func BenchmarkCacheSet(b *testing.B) {
 			}
 		}
 	})
+}
+
+func BenchmarkCacheGet(b *testing.B) {
+	config := cache.Config{
+		MaxSize: 256 * 1024 * 1024,
+		Buckets: 128,
+	}
+	cache := cache.New(config)
+	for i := 0; i < b.N; i++ {
+		wg := sync.WaitGroup{}
+		wg.Add(1000)
+		for j := 0; j < 1000; j++ {
+			go func() {
+				value := uuid.New().String()
+				key := uuid.New().String()
+				cache.Set(key, &value)
+				ret := ""
+				cache.Get(key, &ret)
+				if ret != value {
+					b.Error("Cache returned wrong value " + ret + " for key test")
+				}
+				wg.Done()
+			}()
+		} //for j
+		wg.Wait()
+	}
 }
