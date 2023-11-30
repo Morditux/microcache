@@ -1,6 +1,7 @@
 package microcache_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -103,4 +104,22 @@ func BenchmarkCacheGet(b *testing.B) {
 		} //for j
 		wg.Wait()
 	}
+}
+
+func TestCacheSize(t *testing.T) {
+	config := cache.Config{
+		MaxSize: 1024 * 1024,
+		Buckets: 16,
+	}
+	cache := cache.New(config)
+	if cache == nil {
+		t.Error("NewCache returned nil")
+	}
+	for i := 0; i < 15000; i++ {
+		value := uuid.New().String()
+		key := uuid.New().String()
+		cache.Set(key, &value)
+	}
+	fmt.Println("Cache size: ", cache.Size())
+	fmt.Println("Cache overflow : ", cache.OverflowCount())
 }

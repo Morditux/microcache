@@ -13,11 +13,12 @@ type Config struct {
 }
 
 type Cache struct {
-	config  Config
-	buckets []*Bucket
-	size    atomic.Uint64
-	hits    atomic.Uint64
-	misses  atomic.Uint64
+	config   Config
+	buckets  []*Bucket
+	size     atomic.Uint64
+	hits     atomic.Uint64
+	misses   atomic.Uint64
+	Overflow atomic.Uint64
 }
 
 func New(config Config) *Cache {
@@ -69,6 +70,7 @@ func (c *Cache) Set(key string, value any) {
 	}
 	size := item.Size()
 	if c.size.Load()+size > c.config.MaxSize {
+		c.Overflow.Add(1)
 		for c.size.Load()+size > c.config.MaxSize {
 			for _, bucket := range c.buckets {
 				c.size.Add(-bucket.DeleteLast())
@@ -78,6 +80,7 @@ func (c *Cache) Set(key string, value any) {
 	b, keyHash := c.findBucket(key)
 	bucket := c.getBucket(b)
 	bucket.Set(keyHash, item)
+	c.size.Add(size)
 }
 
 func (c *Cache) findBucket(key string) (uint64, uint64) {
@@ -100,4 +103,8 @@ func (c *Cache) Misses() uint64 {
 
 func (c *Cache) Size() uint64 {
 	return c.size.Load()
+}
+
+func (c *Cache) OverflowCount() uint64 {
+	return c.Overflow.Load()
 }

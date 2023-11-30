@@ -1,6 +1,9 @@
 package microcache
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 type Bucket struct {
 	items map[uint64]*Item
@@ -13,6 +16,7 @@ func NewBucket() *Bucket {
 	return &Bucket{
 		items: make(map[uint64]*Item),
 		m:     &sync.RWMutex{},
+		keys:  NewQueue[uint64](),
 		size:  0,
 	}
 }
@@ -31,6 +35,7 @@ func (b *Bucket) Set(key uint64, value *Item) {
 	b.m.Lock()
 	defer b.m.Unlock()
 	b.items[key] = value
+	b.keys.Push(key)
 }
 
 func (b *Bucket) Delete(key uint64) uint64 {
@@ -42,6 +47,7 @@ func (b *Bucket) Delete(key uint64) uint64 {
 	}
 	b.size -= item.Size()
 	delete(b.items, key)
+	b.keys.Delete(key)
 	return item.Size()
 }
 
@@ -66,7 +72,12 @@ func (b *Bucket) DeleteFirst() uint64 {
 func (b *Bucket) DeleteLast() uint64 {
 	b.m.Lock()
 	defer b.m.Unlock()
-	key := b.keys.PopLeast()
+	key, err := b.keys.PopLeast()
+	if err != nil {
+		if errors.Is(err, ErrEmptyQueueError) {
+			return 0
+		}
+	}
 	item := b.items[key]
 	if item == nil {
 		return 0
