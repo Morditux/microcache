@@ -119,20 +119,6 @@ func (c *Cache) Set(key string, value any) {
 	c.keys.Push(b)
 }
 
-func (c *Cache) Delete(key string) {
-
-	bucket := c.getBucket(c.findBucket(key))
-	item := bucket.Get(key)
-	if item == nil {
-		return
-	}
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.size -= item.Size()
-	bucket.Delete(key)
-
-}
-
 func (c *Cache) findBucket(key string) uint64 {
 	hash := xxhash.Sum64String(key)
 	return hash % uint64(c.config.Buckets)
