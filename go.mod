@@ -1,6 +1,6 @@
 module github.com/Morditux/microcache
 
-go 1.21.3
+go 1.21
 
 require (
 	github.com/cespare/xxhash v1.1.0
