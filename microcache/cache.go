@@ -1,7 +1,6 @@
 package microcache
 
 import (
-	"sync"
 	"sync/atomic"
 
 	"github.com/cespare/xxhash"
@@ -13,18 +12,10 @@ type Config struct {
 	Buckets int
 }
 
-type Bucket struct {
-	items map[string]*Item
-	m     *sync.RWMutex
-	size  int64
-}
-
 type Cache struct {
 	config  Config
 	buckets []*Bucket
-	keys    *Queue[uint64]
-	size    uint64
-	mutex   *sync.Mutex
+	size    atomic.Uint64
 	hits    atomic.Uint64
 	misses  atomic.Uint64
 }
@@ -33,52 +24,22 @@ func New(config Config) *Cache {
 	if config.Buckets == 0 {
 		config.Buckets = 16
 	}
+
 	cache := &Cache{
 		config:  config,
 		buckets: make([]*Bucket, config.Buckets),
-		keys:    NewQueue[uint64](),
-		size:    0,
-		mutex:   &sync.Mutex{},
 	}
+	cache.size.Store(0)
 	for i := 0; i < config.Buckets; i++ {
-		cache.buckets[i] = newBucket()
+		cache.buckets[i] = NewBucket()
 	}
 	return cache
 }
 
-func newBucket() *Bucket {
-	return &Bucket{
-		items: make(map[string]*Item),
-		m:     &sync.RWMutex{},
-		size:  0,
-	}
-}
-
-func (b *Bucket) Get(key string) *Item {
-	b.m.RLock()
-	defer b.m.RUnlock()
-	item, ok := b.items[key]
-	if !ok {
-		return nil
-	}
-	return item
-}
-
-func (b *Bucket) Set(key string, value *Item) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	b.items[key] = value
-}
-
-func (b *Bucket) Delete(key string) {
-	b.m.Lock()
-	defer b.m.Unlock()
-	delete(b.items, key)
-}
-
 func (c *Cache) Get(key string, value any) bool {
-	bucket := c.getBucket(c.findBucket(key))
-	item := bucket.Get(key)
+	bucketId, hashKey := c.findBucket(key)
+	bucket := c.getBucket(bucketId)
+	item := bucket.Get(hashKey)
 	if item == nil {
 		c.misses.Add(1)
 		return false
@@ -91,6 +52,12 @@ func (c *Cache) Get(key string, value any) bool {
 	return true
 }
 
+func (c *Cache) Delete(key string) {
+	bucketId, hashKey := c.findBucket(key)
+	bucket := c.getBucket(bucketId)
+	c.size.Add(-bucket.Delete(hashKey))
+}
+
 func (c *Cache) Set(key string, value any) {
 	data, err := msgpack.Marshal(value)
 	if err != nil {
@@ -101,27 +68,21 @@ func (c *Cache) Set(key string, value any) {
 		Value: data,
 	}
 	size := item.Size()
-	c.mutex.Lock()
-	if c.size+size > c.config.MaxSize {
-		for c.size+size > c.config.MaxSize {
-			b := c.keys.Pop()
-			bucket := c.getBucket(b)
-			item := bucket.Get(key)
-			c.size -= item.Size()
-			bucket.Delete(key)
+	if c.size.Load()+size > c.config.MaxSize {
+		for c.size.Load()+size > c.config.MaxSize {
+			for _, bucket := range c.buckets {
+				c.size.Add(-bucket.DeleteLast())
+			}
 		}
 	}
-	defer c.mutex.Unlock()
-
-	b := c.findBucket(key)
+	b, keyHash := c.findBucket(key)
 	bucket := c.getBucket(b)
-	bucket.Set(key, item)
-	c.keys.Push(b)
+	bucket.Set(keyHash, item)
 }
 
-func (c *Cache) findBucket(key string) uint64 {
+func (c *Cache) findBucket(key string) (uint64, uint64) {
 	hash := xxhash.Sum64String(key)
-	return hash % uint64(c.config.Buckets)
+	return hash % uint64(c.config.Buckets), hash
 }
 
 func (c *Cache) getBucket(key uint64) *Bucket {
@@ -135,4 +96,8 @@ func (c *Cache) Hits() uint64 {
 
 func (c *Cache) Misses() uint64 {
 	return c.misses.Load()
+}
+
+func (c *Cache) Size() uint64 {
+	return c.size.Load()
 }

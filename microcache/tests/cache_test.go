@@ -11,7 +11,7 @@ import (
 func TestNewCache(tests *testing.T) {
 	tests.Log("TestNewCache")
 	config := cache.Config{
-		MaxSize: 1024 * 1024,
+		MaxSize: 1024,
 		Buckets: 16,
 	}
 	cache := cache.New(config)
@@ -23,7 +23,7 @@ func TestNewCache(tests *testing.T) {
 func TestCacheGet(tests *testing.T) {
 	tests.Log("TestCacheGet")
 	config := cache.Config{
-		MaxSize: 1024 * 1024,
+		MaxSize: 1024,
 		Buckets: 16,
 	}
 	cache := cache.New(config)
@@ -40,7 +40,7 @@ func TestCacheGet(tests *testing.T) {
 func TestCacheSet(tests *testing.T) {
 	tests.Log("TestCacheSet")
 	config := cache.Config{
-		MaxSize: 1024 * 1024,
+		MaxSize: 1024,
 		Buckets: 16,
 	}
 	cache := cache.New(config)
@@ -65,7 +65,6 @@ func BenchmarkCacheSet(b *testing.B) {
 		Buckets: 128,
 	}
 	cache := cache.New(config)
-
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			value := uuid.New().String()
