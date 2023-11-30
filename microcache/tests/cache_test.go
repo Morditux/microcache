@@ -108,7 +108,7 @@ func BenchmarkCacheGet(b *testing.B) {
 
 func TestCacheSize(t *testing.T) {
 	config := cache.Config{
-		MaxSize: 1024 * 1024,
+		MaxSize: 1024 * 64,
 		Buckets: 16,
 	}
 	cache := cache.New(config)

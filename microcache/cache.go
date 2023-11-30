@@ -69,10 +69,19 @@ func (c *Cache) Set(key string, value any) {
 		Value: data,
 	}
 	size := item.Size()
+	emptyBucket := 0
 	if c.size.Load()+size > c.config.MaxSize {
 		c.Overflow.Add(1)
 		for c.size.Load()+size > c.config.MaxSize {
+			if emptyBucket == c.config.Buckets {
+				// Item to large for cache
+				return
+			}
 			for _, bucket := range c.buckets {
+				if bucket.Size() == 0 {
+					emptyBucket++
+					continue
+				}
 				c.size.Add(-bucket.DeleteLast())
 			}
 		}
