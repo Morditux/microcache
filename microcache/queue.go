@@ -58,6 +58,7 @@ func (q *Queue[I]) PopLeast() (value I) {
 	}
 	item := q.tail
 	q.tail = item.prev
+	q.tail.next = nil
 	return item.item
 }
 
