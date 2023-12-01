@@ -53,12 +53,6 @@ func (c *Cache) Get(key string, value any) bool {
 	return true
 }
 
-func (c *Cache) Delete(key string) {
-	bucketId, hashKey := c.findBucket(key)
-	bucket := c.getBucket(bucketId)
-	c.size.Add(-bucket.Delete(hashKey))
-}
-
 func (c *Cache) Set(key string, value any) {
 	data, err := msgpack.Marshal(value)
 	if err != nil {

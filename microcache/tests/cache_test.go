@@ -63,7 +63,7 @@ func TestCacheSet(tests *testing.T) {
 func BenchmarkCacheSet(b *testing.B) {
 	config := cache.Config{
 		MaxSize: 256 * 1024 * 1024,
-		Buckets: 128,
+		Buckets: 16,
 	}
 	cache := cache.New(config)
 	b.RunParallel(func(pb *testing.PB) {
@@ -108,7 +108,7 @@ func BenchmarkCacheGet(b *testing.B) {
 
 func TestCacheSize(t *testing.T) {
 	config := cache.Config{
-		MaxSize: 1024 * 64,
+		MaxSize: 1024 * 1024,
 		Buckets: 16,
 	}
 	cache := cache.New(config)
