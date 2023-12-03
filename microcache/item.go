@@ -18,6 +18,10 @@ func NewItem(key string, value []byte, timeToLive time.Duration) *Item {
 	}
 }
 
+func (i *Item) Expired() bool {
+	return time.Since(i.CreateAt) > i.Ttl
+}
+
 func (i *Item) Size() uint64 {
 	return uint64(len(i.Key) + len(i.Value))
 }

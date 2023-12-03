@@ -2,7 +2,6 @@ package microcache
 
 import (
 	"sync"
-	"time"
 
 	"github.com/emirpasic/gods/queues/arrayqueue"
 )
@@ -48,7 +47,6 @@ func (b *Bucket) Size() uint64 {
 func (b *Bucket) applyTTL() uint64 {
 	b.m.Lock()
 	defer b.m.Unlock()
-	now := time.Now()
 	tmp := arrayqueue.New()
 	for !b.keys.Empty() {
 		key, _ := b.keys.Dequeue()
@@ -56,7 +54,7 @@ func (b *Bucket) applyTTL() uint64 {
 		if item == nil {
 			continue
 		}
-		if now.Sub(item.CreateAt) > item.Ttl {
+		if item.Expired() {
 			delete(b.items, key.(uint64))
 		} else {
 			tmp.Enqueue(item)

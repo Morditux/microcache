@@ -59,8 +59,7 @@ func (c *Cache) Get(key string, value any) bool {
 	bucketId, hashKey := c.findBucket(key)
 	bucket := c.getBucket(bucketId)
 	item := bucket.Get(hashKey)
-	now := time.Now()
-	if item != nil && now.Sub(item.CreateAt) > item.Ttl {
+	if item.Expired() {
 		c.misses.Add(1)
 		return false
 	}
