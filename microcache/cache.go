@@ -58,11 +58,12 @@ func (c *Cache) Get(key string, value any) bool {
 	bucketId, hashKey := c.findBucket(key)
 	bucket := c.getBucket(bucketId)
 	item := bucket.Get(hashKey)
-	if item.Expired() {
+	if item == nil {
 		c.misses.Add(1)
 		return false
 	}
-	if item == nil {
+
+	if item.Expired() {
 		c.misses.Add(1)
 		return false
 	}
