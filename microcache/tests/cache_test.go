@@ -88,8 +88,8 @@ func BenchmarkCacheGet(b *testing.B) {
 	cache := cache.New(config)
 	for i := 0; i < b.N; i++ {
 		wg := sync.WaitGroup{}
-		wg.Add(1000)
-		for j := 0; j < 1000; j++ {
+		wg.Add(8)
+		for j := 0; j < 8; j++ {
 			go func() {
 				value := uuid.New().String()
 				key := uuid.New().String()
