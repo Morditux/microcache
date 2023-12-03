@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	MaxSize uint64
-	Buckets int
-	Ttl     time.Duration
+	MaxSize  uint64
+	Buckets  int
+	Ttl      time.Duration
+	Eviction time.Duration
 }
 
 type Cache struct {
@@ -28,7 +29,10 @@ func New(config Config) *Cache {
 		config.Buckets = 16
 	}
 	if config.Ttl == 0 {
-		config.Ttl = time.Second * 60 * 5
+		config.Ttl = time.Minute * 5
+	}
+	if config.Eviction == 0 {
+		config.Eviction = time.Minute * 5
 	}
 
 	cache := &Cache{
@@ -39,6 +43,15 @@ func New(config Config) *Cache {
 	for i := 0; i < config.Buckets; i++ {
 		cache.buckets[i] = NewBucket()
 	}
+	// Start TTL evictor
+	go func() {
+		for {
+			time.Sleep(config.Eviction)
+			for _, bucket := range cache.buckets {
+				bucket.applyTTL()
+			}
+		}
+	}()
 	return cache
 }
 

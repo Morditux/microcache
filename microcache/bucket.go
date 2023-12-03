@@ -19,35 +19,7 @@ func NewBucket() *Bucket {
 		m:     &sync.RWMutex{},
 		keys:  arrayqueue.New(),
 	}
-	bucket.start()
 	return bucket
-}
-
-func (b *Bucket) start() {
-	ticker := time.NewTicker(time.Second * 60)
-	go func() {
-		for {
-			<-ticker.C
-			now := time.Now()
-			b.m.Lock()
-			tmp := arrayqueue.New()
-			for !b.keys.Empty() {
-				key, _ := b.keys.Dequeue()
-				item := b.items[key.(uint64)]
-				if item == nil {
-					continue
-				}
-				if now.Sub(item.CreateAt) < item.Ttl {
-					tmp.Enqueue(item)
-				} else {
-					delete(b.items, key.(uint64))
-				}
-				b.keys = tmp
-			}
-			b.m.Unlock()
-			ticker.Reset(time.Second * 60)
-		}
-	}()
 }
 
 func (b *Bucket) Get(key uint64) *Item {
@@ -70,6 +42,27 @@ func (b *Bucket) Set(key uint64, value *Item) {
 func (b *Bucket) Size() uint64 {
 	b.m.RLock()
 	defer b.m.RUnlock()
+	return uint64(len(b.items))
+}
+
+func (b *Bucket) applyTTL() uint64 {
+	b.m.Lock()
+	defer b.m.Unlock()
+	now := time.Now()
+	tmp := arrayqueue.New()
+	for !b.keys.Empty() {
+		key, _ := b.keys.Dequeue()
+		item := b.items[key.(uint64)]
+		if item == nil {
+			continue
+		}
+		if now.Sub(item.CreateAt) > item.Ttl {
+			delete(b.items, key.(uint64))
+		} else {
+			tmp.Enqueue(item)
+		}
+		b.keys = tmp
+	}
 	return uint64(len(b.items))
 }
 
