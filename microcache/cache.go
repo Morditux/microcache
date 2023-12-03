@@ -2,6 +2,7 @@ package microcache
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/cespare/xxhash"
 	"github.com/vmihailenco/msgpack"
@@ -10,6 +11,7 @@ import (
 type Config struct {
 	MaxSize uint64
 	Buckets int
+	Ttl     time.Duration
 }
 
 type Cache struct {
@@ -24,6 +26,9 @@ type Cache struct {
 func New(config Config) *Cache {
 	if config.Buckets == 0 {
 		config.Buckets = 16
+	}
+	if config.Ttl == 0 {
+		config.Ttl = time.Second * 60 * 5
 	}
 
 	cache := &Cache{
@@ -58,10 +63,7 @@ func (c *Cache) Set(key string, value any) {
 	if err != nil {
 		panic(err)
 	}
-	item := &Item{
-		Key:   key,
-		Value: data,
-	}
+	item := NewItem(key, data, c.config.Ttl)
 	size := item.Size()
 	emptyBucket := 0
 	if c.size.Load()+size > c.config.MaxSize {

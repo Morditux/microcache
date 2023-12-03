@@ -1,14 +1,20 @@
 package microcache
 
+import "time"
+
 type Item struct {
-	Key   string
-	Value []byte
+	Key      string
+	Value    []byte
+	Ttl      time.Duration
+	CreateAt time.Time
 }
 
-func NewItem(key string, value []byte, timeToLive int64) *Item {
+func NewItem(key string, value []byte, timeToLive time.Duration) *Item {
 	return &Item{
-		Key:   key,
-		Value: value,
+		Key:      key,
+		Value:    value,
+		Ttl:      timeToLive,
+		CreateAt: time.Now(),
 	}
 }
 

@@ -2,6 +2,7 @@ package microcache
 
 import (
 	"sync"
+	"time"
 
 	"github.com/emirpasic/gods/queues/arrayqueue"
 )
@@ -13,11 +14,40 @@ type Bucket struct {
 }
 
 func NewBucket() *Bucket {
-	return &Bucket{
+	bucket := &Bucket{
 		items: make(map[uint64]*Item),
 		m:     &sync.RWMutex{},
 		keys:  arrayqueue.New(),
 	}
+	bucket.start()
+	return bucket
+}
+
+func (b *Bucket) start() {
+	ticker := time.NewTicker(time.Second * 60)
+	go func() {
+		for {
+			<-ticker.C
+			now := time.Now()
+			b.m.Lock()
+			tmp := arrayqueue.New()
+			for !b.keys.Empty() {
+				key, _ := b.keys.Dequeue()
+				item := b.items[key.(uint64)]
+				if item == nil {
+					continue
+				}
+				if now.Sub(item.CreateAt) < item.Ttl {
+					tmp.Enqueue(item)
+				} else {
+					delete(b.items, key.(uint64))
+				}
+				b.keys = tmp
+			}
+			b.m.Unlock()
+			ticker.Reset(time.Second * 60)
+		}
+	}()
 }
 
 func (b *Bucket) Get(key uint64) *Item {
