@@ -31,9 +31,6 @@ func New(config Config) *Cache {
 	if config.Ttl == 0 {
 		config.Ttl = time.Minute * 5
 	}
-	if config.Eviction == 0 {
-		config.Eviction = time.Minute * 5
-	}
 
 	cache := &Cache{
 		config:  config,
@@ -44,14 +41,16 @@ func New(config Config) *Cache {
 		cache.buckets[i] = NewBucket()
 	}
 	// Start TTL evictor
-	go func() {
-		for {
-			time.Sleep(config.Eviction)
-			for _, bucket := range cache.buckets {
-				bucket.applyTTL()
+	if config.Eviction != 0 {
+		go func() {
+			for {
+				time.Sleep(config.Eviction)
+				for _, bucket := range cache.buckets {
+					bucket.applyTTL()
+				}
 			}
-		}
-	}()
+		}()
+	}
 	return cache
 }
 
@@ -68,6 +67,9 @@ func (c *Cache) Get(key string, value any) bool {
 		return false
 	}
 	c.hits.Add(1)
+	if c.config.Eviction != 0 {
+		item.CreateAt = time.Now() // Update last access
+	}
 	err := msgpack.Unmarshal(item.Value, value)
 	if err != nil {
 		panic(err)
