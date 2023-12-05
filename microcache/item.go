@@ -11,6 +11,8 @@ type Item struct {
 	Ttl time.Duration
 	// CreateAt stores the timestamp when the item was created.
 	CreateAt time.Time
+	// Valide indicates whether the item is valid or not.
+	Valide bool
 }
 
 // NewItem crée un nouvel élément de cache avec la clé, la valeur et la durée de vie spécifiées.
@@ -21,12 +23,16 @@ func NewItem(key string, value []byte, timeToLive time.Duration) *Item {
 		Value:    value,
 		Ttl:      timeToLive,
 		CreateAt: time.Now(),
+		Valide:   true,
 	}
 }
 
 // Expired returns a boolean value indicating whether the item has expired or not.
 // An item is considered expired if the current time is greater than the time when it was created plus its time-to-live (TTL) duration.
 func (i *Item) Expired() bool {
+	if i.Ttl == 0 {
+		return false
+	}
 	return time.Since(i.CreateAt) > i.Ttl
 }
 

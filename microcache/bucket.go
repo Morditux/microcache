@@ -57,9 +57,20 @@ func (b *Bucket) Size() uint64 {
 	return uint64(len(b.items))
 }
 
-// applyTTL applies the time-to-live (TTL) logic to the items in the bucket.
+func (b *Bucket) Delete(key uint64) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	item := b.items[key]
+	if item == nil {
+		return
+	}
+	// mark the item as invalid, i will be deleted by the next clean
+	item.Valide = false
+}
+
+// clean applies the time-to-live (TTL) logic to the items in the bucket.
 // It removes expired items from the bucket and returns the number of removed items and their total size.
-func (b *Bucket) applyTTL() (nbRemoved uint64, removedSize uint64) {
+func (b *Bucket) clean() (nbRemoved uint64, removedSize uint64) {
 	removed := uint64(0)
 	b.m.Lock()
 	defer b.m.Unlock()
@@ -70,7 +81,7 @@ func (b *Bucket) applyTTL() (nbRemoved uint64, removedSize uint64) {
 		if item == nil {
 			continue
 		}
-		if item.Expired() {
+		if item.Expired() || !item.Valide {
 			removed += item.Size()
 			delete(b.items, key.(uint64))
 		} else {

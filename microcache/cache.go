@@ -36,10 +36,9 @@ func New(config Config) *Cache {
 	if config.Buckets == 0 {
 		config.Buckets = 16
 	}
-	if config.Ttl == 0 {
-		config.Ttl = time.Minute * 5
+	if config.Eviction == 0 {
+		config.Eviction = 5 * time.Minute
 	}
-
 	cache := &Cache{
 		config:  config,
 		buckets: make([]*Bucket, config.Buckets),
@@ -49,18 +48,16 @@ func New(config Config) *Cache {
 		cache.buckets[i] = NewBucket()
 	}
 	// Start TTL evictor
-	if config.Eviction != 0 {
-		tickerChan := time.NewTicker(config.Eviction).C
-		go func() {
-			for range tickerChan {
-				time.Sleep(config.Eviction)
-				for _, bucket := range cache.buckets {
-					_, removedSize := bucket.applyTTL()
-					cache.size.Add(-removedSize)
-				}
+	tickerChan := time.NewTicker(config.Eviction).C
+	go func() {
+		for range tickerChan {
+			time.Sleep(config.Eviction)
+			for _, bucket := range cache.buckets {
+				_, removedSize := bucket.clean()
+				cache.size.Add(-removedSize)
 			}
-		}()
-	}
+		}
+	}()
 	return cache
 }
 
@@ -82,6 +79,11 @@ func (c *Cache) Get(key string, value any) bool {
 		c.misses.Add(1)
 		return false
 	}
+	if !item.Valide {
+		c.misses.Add(1)
+		return false
+	}
+
 	c.hits.Add(1)
 	if c.config.Eviction != 0 {
 		item.CreateAt = time.Now() // Update last access
@@ -128,6 +130,12 @@ func (c *Cache) Set(key string, value any) {
 	bucket := c.getBucket(b)
 	bucket.Set(keyHash, item)
 	c.size.Add(size)
+}
+
+func (c Cache) Delete(key string) {
+	b, keyHash := c.findBucket(key)
+	bucket := c.getBucket(b)
+	bucket.Delete(keyHash)
 }
 
 // findBucket is a method that calculates the bucket index and hash value for a given key.
