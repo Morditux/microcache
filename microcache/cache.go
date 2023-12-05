@@ -132,7 +132,7 @@ func (c *Cache) Set(key string, value any) {
 	c.size.Add(size)
 }
 
-func (c Cache) Delete(key string) {
+func (c *Cache) Delete(key string) {
 	b, keyHash := c.findBucket(key)
 	bucket := c.getBucket(b)
 	bucket.Delete(keyHash)
