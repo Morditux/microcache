@@ -76,7 +76,10 @@ func (b *Bucket) clean() (nbRemoved uint64, removedSize uint64) {
 	defer b.m.Unlock()
 	tmp := arrayqueue.New()
 	for !b.keys.Empty() {
-		key, _ := b.keys.Dequeue()
+		key, ok := b.keys.Dequeue()
+		if !ok {
+			continue
+		}
 		item := b.items[key.(uint64)]
 		if item == nil {
 			continue
