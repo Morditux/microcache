@@ -88,10 +88,10 @@ func (b *Bucket) clean() (nbRemoved uint64, removedSize uint64) {
 			removed += item.Size()
 			delete(b.items, key.(uint64))
 		} else {
-			tmp.Enqueue(item)
+			tmp.Enqueue(key)
 		}
-		b.keys = tmp
 	}
+	b.keys = tmp
 	return uint64(len(b.items)), removed
 }
 
